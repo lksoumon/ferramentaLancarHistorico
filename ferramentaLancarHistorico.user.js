@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SIGEDUCA - Facilitador de Histórico Escolar
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Cria uma barra de pesquisa inteligente que preenche a Área e Disciplina automaticamente a partir de um JSON comprimido.
 // @author       Lucas Monteiro
 // @match        http://sigeduca.seduc.mt.gov.br/ged/hwtgedhistoricoescolar.aspx?*
@@ -23,10 +23,9 @@
     ];
     // =========================================================================
 
-    let listaPlana = [];
+let listaPlana = [];
     const STORAGE_KEY = 'sigeduca_fav_disciplinas';
 
-    // Gerenciamento de Favoritos (Local Storage)
     function getFavoritos() {
         try {
             return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
@@ -38,14 +37,13 @@
     function toggleFavorito(idUnico) {
         let favs = getFavoritos();
         if (favs.includes(idUnico)) {
-            favs = favs.filter(f => f !== idUnico); // Remove
+            favs = favs.filter(f => f !== idUnico);
         } else {
-            favs.push(idUnico); // Adiciona
+            favs.push(idUnico);
         }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
     }
 
-    // Prepara a lista plana de disciplinas
     function prepararDados() {
         if (!BANCO_DADOS || BANCO_DADOS.length === 0) {
             console.warn("Script Facilitador: O BANCO_DADOS está vazio. Cole seu JSON no script.");
@@ -71,7 +69,6 @@
         });
     }
 
-    // Lógica de Automação do GeneXus
     async function preencherCamposSiga(codArea, nomeDiscBusca) {
         const areaSelect = document.getElementById('vGEDHISTAREACOD');
         const discSelect = document.getElementById('vGEDHISTDISCCOD');
@@ -115,7 +112,6 @@
         }
     }
 
-    // Montagem da Interface
     function iniciarPainel() {
         const alvoElemento = document.getElementById('TTITULO1');
         if (!alvoElemento) return;
@@ -131,10 +127,17 @@
         divFacilitador.id = 'div-facilitador-siga';
         divFacilitador.style.cssText = 'display: none; border: 2px solid #0275d8; padding: 15px; margin: 10px 0 20px 0; background-color: #f8f9fa; border-radius: 5px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);';
 
+        // Novo Layout com 2 campos (flexbox)
         divFacilitador.innerHTML = `
-            <div style="margin-bottom: 10px;">
-                <label style="display: block; font-weight: bold; color: #333; margin-bottom: 5px; font-size: 13px;">Pesquisar Nome da Disciplina:</label>
-                <input type="text" id="input-busca-disciplina" autocomplete="off" placeholder="Busque apenas pela disciplina..." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px;">
+            <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+                <div style="flex-grow: 1;">
+                    <label style="display: block; font-weight: bold; color: #333; margin-bottom: 5px; font-size: 13px;">Pesquisar Disciplina:</label>
+                    <input type="text" id="input-busca-disciplina" autocomplete="off" placeholder="Ex: Matemática..." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px;">
+                </div>
+                <div style="width: 120px;">
+                    <label style="display: block; font-weight: bold; color: #333; margin-bottom: 5px; font-size: 13px;">Cód. Área:</label>
+                    <input type="text" id="input-busca-area" autocomplete="off" placeholder="Ex: 150" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; text-align: center;">
+                </div>
             </div>
             <div id="wrapper-resultados-siga" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; background: white; border-radius: 4px; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05);"></div>
         `;
@@ -151,24 +154,39 @@
             }
         });
 
-        const inputBusca = document.getElementById('input-busca-disciplina');
+        const inputBuscaDisc = document.getElementById('input-busca-disciplina');
+        const inputBuscaArea = document.getElementById('input-busca-area');
         const divResultados = document.getElementById('wrapper-resultados-siga');
 
-        inputBusca.addEventListener('input', (e) => {
-            const termoBusca = e.target.value.toLowerCase().trim();
+        // Função principal de busca (lida com os dois campos)
+        function realizarBusca() {
+            const termoDisc = inputBuscaDisc.value.toLowerCase().trim();
+            const termoArea = inputBuscaArea.value.trim();
             divResultados.innerHTML = '';
 
-            if (termoBusca.length < 2) {
+            // Só pesquisa se tiver digitado pelo menos 2 letras na disciplina ou algum número na área
+            if (termoDisc.length < 2 && termoArea.length === 0) {
                 divResultados.style.display = 'none';
                 return;
             }
 
             let favsAtuais = getFavoritos();
 
-            // 1. Filtra APENAS pelo nome da disciplina
-            let filtrados = listaPlana.filter(item =>
-                item.nomeDisc.toLowerCase().includes(termoBusca)
-            );
+            // 1. Filtra avaliando os dois campos
+            let filtrados = listaPlana.filter(item => {
+                let matchDisc = true;
+                let matchArea = true;
+
+                if (termoDisc.length > 0) {
+                    matchDisc = item.nomeDisc.toLowerCase().includes(termoDisc);
+                }
+                if (termoArea.length > 0) {
+                    // Exige que o código contenha o número digitado
+                    matchArea = item.codArea.includes(termoArea);
+                }
+
+                return matchDisc && matchArea;
+            });
 
             // 2. Ordenação Multi-nível
             filtrados.sort((a, b) => {
@@ -177,22 +195,17 @@
                 let isFavA = favsAtuais.includes(idA);
                 let isFavB = favsAtuais.includes(idB);
 
-                // Nível 1: Favoritos primeiro
                 if (isFavA && !isFavB) return -1;
                 if (!isFavA && isFavB) return 1;
 
-                // Nível 2: Ordem numérica do Código da Área
                 let numA = parseInt(a.codArea, 10) || 0;
                 let numB = parseInt(b.codArea, 10) || 0;
                 if (numA !== numB) {
                     return numA - numB;
                 }
 
-                // Nível 3: Ordem alfabética do Nome da Disciplina (se a área for a mesma)
                 return a.nomeDisc.localeCompare(b.nomeDisc);
             });
-
-            // LIMITE REMOVIDO: Agora mostrará todos os resultados encontrados.
 
             if (filtrados.length === 0) {
                 divResultados.innerHTML = '<div style="padding: 10px; color: #888; font-style: italic; font-size: 13px;">Nenhuma disciplina localizada.</div>';
@@ -229,7 +242,7 @@
                 itemLinha.addEventListener('mouseleave', () => itemLinha.style.backgroundColor = 'transparent');
 
                 itemLinha.querySelector('.area-clicavel').addEventListener('click', () => {
-                    inputBusca.value = item.nomeDisc;
+                    inputBuscaDisc.value = item.nomeDisc;
                     divResultados.style.display = 'none';
                     preencherCamposSiga(item.codArea, item.nomeDisc);
                 });
@@ -237,15 +250,20 @@
                 itemLinha.querySelector('.area-estrela').addEventListener('click', (e) => {
                     e.stopPropagation();
                     toggleFavorito(idUnico);
-                    inputBusca.dispatchEvent(new Event('input'));
+                    realizarBusca(); // Atualiza a lista pra mover a estrela pro topo
                 });
 
                 divResultados.appendChild(itemLinha);
             });
 
             divResultados.style.display = 'block';
-        });
+        }
 
+        // Aciona a busca quando digitar em QUALQUER um dos dois campos
+        inputBuscaDisc.addEventListener('input', realizarBusca);
+        inputBuscaArea.addEventListener('input', realizarBusca);
+
+        // Fecha se clicar fora
         document.addEventListener('click', (e) => {
             if (!divFacilitador.contains(e.target)) {
                 divResultados.style.display = 'none';
