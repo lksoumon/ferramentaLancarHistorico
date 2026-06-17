@@ -3,10 +3,12 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.1
 // @description  Cria uma barra de pesquisa inteligente que preenche a Área e Disciplina automaticamente a partir de um JSON comprimido.
-// @author       Você / Gemini
+// @author       Lucas Monteiro
 // @match        http://sigeduca.seduc.mt.gov.br/ged/hwtgedhistoricoescolar.aspx?*
 // @grant        none
 // @run-at       document-end
+// @updateURL    https://github.com/lksoumon/ferramentaLancarHistorico/raw/refs/heads/main/ferramentaLancarHistorico.user.js
+// @downloadURL  https://github.com/lksoumon/ferramentaLancarHistorico/raw/refs/heads/main/ferramentaLancarHistorico.user.js
 // ==/UserScript==
 
 (function() {
